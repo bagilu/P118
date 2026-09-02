@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="以年代拉桿探索臺灣文化分布，並下載透明 PNG 與可編輯 SVG。">
+  <title>P118 先民地圖</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./config.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-symbol" aria-hidden="true"></span>
+        <div><small>P118 · TEMPORAL ATLAS</small><h1>先民地圖</h1></div>
+      </div>
+      <div class="downloads" aria-label="下載目前地圖">
+        <button id="downloadPng" class="button secondary" type="button" disabled>↓ 透明 PNG</button>
+        <button id="downloadSvg" class="button primary" type="button" disabled>↓ 可編輯 SVG</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="controls" aria-label="年代與圖層控制">
+        <section class="panel timeline-panel" id="timelinePanel">
+          <div class="section-title"><span>◷</span><div><small>TIME</small><h2>年代</h2></div></div>
+          <output id="yearDisplay" class="year-display">BC 5,000</output>
+          <input id="timeline" type="range" min="0" max="1" step="1" value="0" aria-label="年代">
+          <div class="range-ends"><span id="firstYear">BC 5,000</span><span id="lastYear">BC 2,700</span></div>
+          <p class="hint">游標停在此區域時，可用滾輪切換年代節點。</p>
+        </section>
+
+        <section class="panel">
+          <div class="section-title"><span>▱</span><div><small>LAYERS</small><h2>參考圖層</h2></div></div>
+          <label class="toggle-row"><span><strong>現代縣市界</strong><small>僅供位置參考</small></span><input id="showCounties" type="checkbox"><i></i></label>
+          <label class="toggle-row"><span><strong>主要城市</strong><small>六個現代城市位置</small></span><input id="showCities" type="checkbox" checked><i></i></label>
+        </section>
+
+        <section class="panel compact">
+          <div class="status-box"><span aria-hidden="true">●</span><div><small>資料狀態</small><strong id="dataStatus">載入中</strong></div></div>
+        </section>
+      </aside>
+
+      <section class="map-stage" aria-label="臺灣先民年代地圖">
+        <div id="map"></div>
+        <div id="loading" class="loading">正在準備地圖資料…</div>
+        <div class="year-chip"><small>目前年代</small><strong id="mapYear">BC 5,000</strong></div>
+        <div class="legend"><span><i class="culture-key"></i>文化分布</span><span><i class="coast-key"></i>海岸線</span></div>
+        <button id="resetMap" class="reset-button" type="button" aria-label="回到臺灣全圖" title="回到臺灣全圖">↺</button>
+      </section>
+
+      <aside class="details" aria-label="文化資料說明">
+        <div class="section-title"><span>ⓘ</span><div><small>RECORD</small><h2>文化資料</h2></div></div>
+        <article id="record" class="record" hidden>
+          <div class="record-kind"><i id="cultureSwatch"></i><span id="recordStatus">示意資料</span></div>
+          <h3 id="cultureTitle"></h3>
+          <p id="cultureEnglish" class="english-title"></p>
+          <div class="period-box"><span>◷</span><div><small>年代範圍</small><strong id="culturePeriod"></strong></div></div>
+          <p id="cultureSummary" class="summary"></p>
+          <div class="source"><small>資料來源</small><p id="cultureSource"></p></div>
+        </article>
+        <div id="emptyRecord" class="empty-record" hidden>此年代尚無可顯示的文化資料。</div>
+        <div class="reading-note"><strong>閱讀提醒</strong><p>縣市與城市為現代位置參考，不代表史前行政區或文化疆域。</p></div>
+      </aside>
+    </div>
+
+    <footer><span>P118 先民地圖 · V0.1 Static</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
