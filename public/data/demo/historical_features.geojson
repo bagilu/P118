@@ -1,0 +1,42 @@
+{
+  "type": "FeatureCollection",
+  "name": "P118 V0.1 demonstration historical layer",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "demo-dabenkeng",
+      "properties": {
+        "EntityID": 1,
+        "Slug": "demo-dabenkeng",
+        "TitleZh": "大坌坑文化（示意圖層）",
+        "TitleEn": "Dabenkeng Culture (demonstration layer)",
+        "StartYear": -5000,
+        "EndYear": -2700,
+        "SummaryZh": "本多邊形僅用來驗證年代拉桿、圖層顯示與下載功能，不代表正式考古學分布範圍。正式版本須根據文獻與考古資料重新建置。",
+        "SourceCitation": "P118 V0.1 system demonstration data",
+        "SourceURL": "",
+        "DisplayColor": "#d06a42",
+        "DataStatus": "demo",
+        "LabelLongitude": 121.20,
+        "LabelLatitude": 25.08
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [121.02, 25.20],
+              [121.13, 25.30],
+              [121.31, 25.27],
+              [121.43, 25.17],
+              [121.38, 25.02],
+              [121.24, 24.92],
+              [121.08, 24.98],
+              [121.02, 25.20]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
