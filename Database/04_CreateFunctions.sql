@@ -1,21 +1,30 @@
--- P118 / 04: 前端取得文化圖徵的 RPC
+-- P118 / 04: 前端取得文化與遺址點位的 RPC（V0.2）
+-- V0.1 的 P118_GetTimelineFeatures() 保留不動，供必要時回復舊版。
 
-create or replace function public."P118_GetTimelineFeatures"()
+create or replace function public."P118_GetTimelineSites"()
 returns table (
+  "EntitySiteID" bigint,
   "EntityID" bigint,
-  "GeometryID" bigint,
-  "Slug" text,
+  "SiteID" bigint,
+  "CultureSlug" text,
   "TitleZh" text,
   "TitleEn" text,
   "StartYear" integer,
   "EndYear" integer,
   "SummaryZh" text,
-  "SourceCitation" text,
-  "SourceURL" text,
+  "CultureSourceCitation" text,
+  "CultureSourceURL" text,
   "DisplayColor" text,
-  "GeometryGeoJSON" jsonb,
-  "LabelLongitude" double precision,
-  "LabelLatitude" double precision
+  "SiteSlug" text,
+  "SiteNameZh" text,
+  "SiteNameEn" text,
+  "Longitude" double precision,
+  "Latitude" double precision,
+  "LocationNote" text,
+  "SiteSourceCitation" text,
+  "SiteSourceURL" text,
+  "EvidenceNote" text,
+  "IsPrimary" boolean
 )
 language sql
 stable
@@ -23,8 +32,9 @@ security invoker
 set search_path = ''
 as $$
   select
+    es."EntitySiteID",
     e."EntityID",
-    g."GeometryID",
+    s."SiteID",
     e."Slug",
     e."TitleZh",
     e."TitleEn",
@@ -34,12 +44,20 @@ as $$
     e."SourceCitation",
     e."SourceURL",
     e."DisplayColor",
-    extensions.st_asgeojson(g."Geometry")::jsonb,
-    case when g."LabelPoint" is null then null else extensions.st_x(g."LabelPoint") end,
-    case when g."LabelPoint" is null then null else extensions.st_y(g."LabelPoint") end
+    s."Slug",
+    s."SiteNameZh",
+    s."SiteNameEn",
+    s."Longitude",
+    s."Latitude",
+    s."LocationNote",
+    s."SourceCitation",
+    s."SourceURL",
+    es."EvidenceNote",
+    es."IsPrimary"
   from public."TblP118HistoricalEntity" e
-  join public."TblP118HistoricalGeometry" g
-    on g."EntityID" = e."EntityID"
+  join public."TblP118EntitySite" es on es."EntityID" = e."EntityID"
+  join public."TblP118ArchaeologicalSite" s on s."SiteID" = es."SiteID"
   where e."IsPublished" = true
-  order by e."StartYear", e."EntityID", g."SortOrder", g."GeometryID";
+    and s."IsPublished" = true
+  order by e."StartYear", e."EntityID", es."SortOrder", s."SiteID";
 $$;

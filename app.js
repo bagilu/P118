@@ -17,12 +17,13 @@ const state = {
   counties: EMPTY,
   coastline: EMPTY,
   cities: EMPTY,
-  historical: EMPTY,
-  stops: [-5000, -2700],
+  sites: EMPTY,
+  stops: [-28050, -3050],
   index: 0,
   selectedId: null,
   map: null,
-  markers: [],
+  cityMarkers: [],
+  siteMarkers: [],
   ready: false,
   sourceMode: "loading"
 };
@@ -48,6 +49,13 @@ const ui = {
   culturePeriod: el("culturePeriod"),
   cultureSummary: el("cultureSummary"),
   cultureSource: el("cultureSource"),
+  cultureSourceLink: el("cultureSourceLink"),
+  siteName: el("siteName"),
+  siteEnglish: el("siteEnglish"),
+  siteCoordinates: el("siteCoordinates"),
+  siteNote: el("siteNote"),
+  siteSource: el("siteSource"),
+  siteSourceLink: el("siteSourceLink"),
   downloadPng: el("downloadPng"),
   downloadSvg: el("downloadSvg"),
   resetMap: el("resetMap")
@@ -84,14 +92,14 @@ async function fetchJson(path) {
   return response.json();
 }
 
-async function fetchHistorical() {
+async function fetchTimelineSites() {
   const config = window.P118_CONFIG || {};
   const url = String(config.SUPABASE_URL || "").trim().replace(/\/$/, "");
   const key = String(config.SUPABASE_ANON_KEY || "").trim();
 
   if (url && key) {
     try {
-      const rpc = String(config.TIMELINE_RPC || "P118_GetTimelineFeatures").trim();
+      const rpc = String(config.TIMELINE_RPC || "P118_GetTimelineSites").trim();
       const response = await fetch(url + "/rest/v1/rpc/" + rpc, {
         method: "POST",
         headers: {
@@ -109,31 +117,41 @@ async function fetchHistorical() {
           type: "FeatureCollection",
           features: rows.map((row) => ({
             type: "Feature",
-            id: String(row.GeometryID || row.EntityID),
-            geometry: typeof row.GeometryGeoJSON === "string"
-              ? JSON.parse(row.GeometryGeoJSON)
-              : row.GeometryGeoJSON,
+            id: String(row.EntitySiteID),
+            geometry: {
+              type: "Point",
+              coordinates: [Number(row.Longitude), Number(row.Latitude)]
+            },
             properties: {
+              EntitySiteID: row.EntitySiteID,
               EntityID: row.EntityID,
-              GeometryID: row.GeometryID,
-              Slug: row.Slug,
+              SiteID: row.SiteID,
+              CultureSlug: row.CultureSlug,
               TitleZh: row.TitleZh,
               TitleEn: row.TitleEn,
               StartYear: row.StartYear,
               EndYear: row.EndYear,
               SummaryZh: row.SummaryZh,
-              SourceCitation: row.SourceCitation,
-              SourceURL: row.SourceURL,
+              CultureSourceCitation: row.CultureSourceCitation,
+              CultureSourceURL: row.CultureSourceURL,
               DisplayColor: row.DisplayColor,
-              DataStatus: "published",
-              LabelLongitude: row.LabelLongitude,
-              LabelLatitude: row.LabelLatitude
+              SiteSlug: row.SiteSlug,
+              SiteNameZh: row.SiteNameZh,
+              SiteNameEn: row.SiteNameEn,
+              Longitude: row.Longitude,
+              Latitude: row.Latitude,
+              LocationNote: row.LocationNote,
+              SiteSourceCitation: row.SiteSourceCitation,
+              SiteSourceURL: row.SiteSourceURL,
+              EvidenceNote: row.EvidenceNote,
+              IsPrimary: row.IsPrimary,
+              DataStatus: "published"
             }
           }))
         }
       };
     } catch (error) {
-      console.warn("Supabase 暫時無法使用，改用示意資料。", error);
+      console.warn("Supabase 暫時無法使用，改用本機遺址示意資料。", error);
     }
   }
 
@@ -144,21 +162,21 @@ async function fetchHistorical() {
 }
 
 function currentYear() {
-  return state.stops[state.index] ?? state.stops[0] ?? -5000;
+  return state.stops[state.index] ?? state.stops[0] ?? -28050;
 }
 
 function activeFeatures() {
   const year = currentYear();
-  return state.historical.features.filter((feature) => activeAt(feature, year));
+  return state.sites.features.filter((feature) => activeAt(feature, year));
 }
 
 function buildStops() {
-  const values = state.historical.features.flatMap((feature) => [
+  const values = state.sites.features.flatMap((feature) => [
     numberProp(feature, "StartYear"),
     numberProp(feature, "EndYear")
   ]);
   state.stops = [...new Set(values)].filter((year) => year !== 0).sort((a, b) => a - b);
-  if (!state.stops.length) state.stops = [-5000, -2700];
+  if (!state.stops.length) state.stops = [-28050, -3050];
   state.index = 0;
   ui.timeline.min = "0";
   ui.timeline.max = String(Math.max(0, state.stops.length - 1));
@@ -178,9 +196,17 @@ function updateTimeline() {
 function chooseSelected(features) {
   if (!features.length) return null;
   const existing = features.find(
-    (feature) => String(numberProp(feature, "EntityID")) === String(state.selectedId)
+    (feature) => String(numberProp(feature, "EntitySiteID")) === String(state.selectedId)
   );
   return existing || features[0];
+}
+
+function setSourceLink(link, value) {
+  const url = String(value || "").trim();
+  const allowed = /^https?:\/\//i.test(url);
+  link.hidden = !allowed;
+  if (allowed) link.href = url;
+  else link.removeAttribute("href");
 }
 
 function updateRecord(features) {
@@ -191,7 +217,7 @@ function updateRecord(features) {
     return;
   }
 
-  state.selectedId = String(numberProp(feature, "EntityID"));
+  state.selectedId = String(numberProp(feature, "EntitySiteID"));
   ui.record.hidden = false;
   ui.emptyRecord.hidden = true;
   ui.recordStatus.textContent = textProp(feature, "DataStatus") === "demo"
@@ -205,30 +231,60 @@ function updateRecord(features) {
     numberProp(feature, "EndYear")
   );
   ui.cultureSummary.textContent = textProp(feature, "SummaryZh");
-  ui.cultureSource.textContent = textProp(feature, "SourceCitation", "尚未提供");
+  ui.cultureSource.textContent = textProp(feature, "CultureSourceCitation", "尚未提供");
+  setSourceLink(ui.cultureSourceLink, textProp(feature, "CultureSourceURL"));
+
+  const longitude = numberProp(feature, "Longitude", Number.NaN);
+  const latitude = numberProp(feature, "Latitude", Number.NaN);
+  ui.siteName.textContent = textProp(feature, "SiteNameZh");
+  ui.siteEnglish.textContent = textProp(feature, "SiteNameEn");
+  ui.siteCoordinates.textContent = Number.isFinite(longitude) && Number.isFinite(latitude)
+    ? longitude.toFixed(6) + ", " + latitude.toFixed(6)
+    : "座標尚未提供";
+  ui.siteNote.textContent = textProp(feature, "LocationNote");
+  ui.siteSource.textContent = textProp(feature, "SiteSourceCitation", "尚未提供");
+  setSourceLink(ui.siteSourceLink, textProp(feature, "SiteSourceURL"));
+}
+
+function updateSiteMarkers(features) {
+  state.siteMarkers.forEach((marker) => marker.remove());
+  state.siteMarkers = [];
+  const seen = new Set();
+  features.forEach((feature) => {
+    const siteId = textProp(feature, "SiteID", feature.id);
+    if (seen.has(siteId)) return;
+    seen.add(siteId);
+    const label = document.createElement("div");
+    label.className = "site-label";
+    label.textContent = textProp(feature, "SiteNameZh");
+    const marker = new Marker({ element: label, anchor: "left", offset: [11, 0] })
+      .setLngLat(feature.geometry.coordinates)
+      .addTo(state.map);
+    state.siteMarkers.push(marker);
+  });
 }
 
 function updateHistoricalLayer() {
   const features = activeFeatures();
   if (state.ready) {
-    state.map.getSource("historical").setData({
+    state.map.getSource("historical-sites").setData({
       type: "FeatureCollection",
       features
     });
+    updateSiteMarkers(features);
   }
   updateTimeline();
   updateRecord(features);
 }
 
 function createCityMarkers() {
-  state.markers.forEach((marker) => marker.remove());
-  state.markers = state.cities.features.map((feature) => {
+  state.cityMarkers.forEach((marker) => marker.remove());
+  state.cityMarkers = state.cities.features.map((feature) => {
     const label = document.createElement("div");
     label.className = "city-label";
     label.textContent = textProp(feature, "NameZh");
-    const point = feature.geometry.coordinates;
     return new Marker({ element: label, anchor: "left", offset: [8, 0] })
-      .setLngLat([point[0], point[1]])
+      .setLngLat(feature.geometry.coordinates)
       .addTo(state.map);
   });
 }
@@ -238,7 +294,7 @@ function addMapContent() {
   map.addSource("counties", { type: "geojson", data: state.counties });
   map.addSource("coastline", { type: "geojson", data: state.coastline });
   map.addSource("cities", { type: "geojson", data: state.cities });
-  map.addSource("historical", {
+  map.addSource("historical-sites", {
     type: "geojson",
     data: { type: "FeatureCollection", features: activeFeatures() }
   });
@@ -257,22 +313,25 @@ function addMapContent() {
     paint: { "line-color": COLORS.county, "line-width": 0.8, "line-opacity": 0.75 }
   });
   map.addLayer({
-    id: "historical-fill",
-    type: "fill",
-    source: "historical",
+    id: "site-halos",
+    type: "circle",
+    source: "historical-sites",
     paint: {
-      "fill-color": ["coalesce", ["get", "DisplayColor"], COLORS.culture],
-      "fill-opacity": 0.44
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 8, 7, 11, 10, 15, 12, 18],
+      "circle-color": ["coalesce", ["get", "DisplayColor"], COLORS.culture],
+      "circle-opacity": 0.16
     }
   });
   map.addLayer({
-    id: "historical-outline",
-    type: "line",
-    source: "historical",
+    id: "historical-site-points",
+    type: "circle",
+    source: "historical-sites",
     paint: {
-      "line-color": ["coalesce", ["get", "DisplayColor"], COLORS.culture],
-      "line-width": 2,
-      "line-dasharray": [3, 2]
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 4.5, 7, 6.5, 10, 9, 12, 11],
+      "circle-color": ["coalesce", ["get", "DisplayColor"], COLORS.culture],
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 2,
+      "circle-opacity": 0.94
     }
   });
   map.addLayer({
@@ -294,17 +353,18 @@ function addMapContent() {
   });
 
   createCityMarkers();
-  map.on("click", "historical-fill", (event) => {
-    const entityId = event.features?.[0]?.properties?.EntityID;
-    if (entityId != null) {
-      state.selectedId = String(entityId);
+  updateSiteMarkers(activeFeatures());
+  map.on("click", "historical-site-points", (event) => {
+    const entitySiteId = event.features?.[0]?.properties?.EntitySiteID;
+    if (entitySiteId != null) {
+      state.selectedId = String(entitySiteId);
       updateRecord(activeFeatures());
     }
   });
-  map.on("mouseenter", "historical-fill", () => {
+  map.on("mouseenter", "historical-site-points", () => {
     map.getCanvas().style.cursor = "pointer";
   });
-  map.on("mouseleave", "historical-fill", () => {
+  map.on("mouseleave", "historical-site-points", () => {
     map.getCanvas().style.cursor = "";
   });
 
@@ -358,7 +418,7 @@ function setupEvents() {
       "visibility",
       ui.showCities.checked ? "visible" : "none"
     );
-    state.markers.forEach((marker) => {
+    state.cityMarkers.forEach((marker) => {
       marker.getElement().style.display = ui.showCities.checked ? "block" : "none";
     });
   });
@@ -386,6 +446,22 @@ async function waitForMapRender() {
   });
 }
 
+function siteRadiusAtZoom(zoom) {
+  if (zoom <= 4) return 4.5;
+  if (zoom <= 7) return 4.5 + (zoom - 4) * (2 / 3);
+  if (zoom <= 10) return 6.5 + (zoom - 7) * (2.5 / 3);
+  return Math.min(11, 9 + (zoom - 10));
+}
+
+function drawLabel(context, textValue, x, y, ratio, color, size = 15) {
+  context.font = "700 " + (size * ratio) + "px Arial, sans-serif";
+  context.strokeStyle = "rgba(255,255,255,.96)";
+  context.lineWidth = 4 * ratio;
+  context.strokeText(textValue, x, y);
+  context.fillStyle = color;
+  context.fillText(textValue, x, y);
+}
+
 async function downloadPng() {
   if (!state.ready) return;
   await waitForMapRender();
@@ -401,50 +477,37 @@ async function downloadPng() {
   const ratio = output.width / map.getContainer().clientWidth;
   context.textBaseline = "middle";
   context.lineJoin = "round";
-  context.font = "600 " + (15 * ratio) + "px Arial, sans-serif";
 
   if (ui.showCities.checked) {
     state.cities.features.forEach((feature) => {
-      const coordinates = feature.geometry.coordinates;
-      const point = map.project(coordinates);
-      const x = point.x * ratio;
-      const y = point.y * ratio;
-      context.beginPath();
-      context.arc(x, y, 4 * ratio, 0, Math.PI * 2);
-      context.fillStyle = COLORS.city;
-      context.fill();
-      context.strokeStyle = "#ffffff";
-      context.lineWidth = 1.5 * ratio;
-      context.stroke();
-      context.strokeStyle = "rgba(255,255,255,.94)";
-      context.lineWidth = 4 * ratio;
-      context.strokeText(textProp(feature, "NameZh"), x + 8 * ratio, y);
-      context.fillStyle = "#20383e";
-      context.fillText(textProp(feature, "NameZh"), x + 8 * ratio, y);
+      const point = map.project(feature.geometry.coordinates);
+      drawLabel(context, textProp(feature, "NameZh"), (point.x + 8) * ratio,
+        point.y * ratio, ratio, COLORS.ink || "#20383e", 14);
     });
   }
 
+  const seen = new Set();
   activeFeatures().forEach((feature) => {
-    const lng = numberProp(feature, "LabelLongitude", Number.NaN);
-    const lat = numberProp(feature, "LabelLatitude", Number.NaN);
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
-    const point = map.project([lng, lat]);
+    const siteId = textProp(feature, "SiteID", feature.id);
+    if (seen.has(siteId)) return;
+    seen.add(siteId);
+    const point = map.project(feature.geometry.coordinates);
     const x = point.x * ratio;
     const y = point.y * ratio;
-    context.font = "700 " + (16 * ratio) + "px Arial, sans-serif";
-    context.strokeStyle = "rgba(255,255,255,.94)";
-    context.lineWidth = 4 * ratio;
-    context.strokeText(textProp(feature, "TitleZh"), x, y);
-    context.fillStyle = "#7c331f";
-    context.fillText(textProp(feature, "TitleZh"), x, y);
+    const radius = siteRadiusAtZoom(map.getZoom()) * ratio;
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fillStyle = textProp(feature, "DisplayColor", COLORS.culture);
+    context.fill();
+    context.strokeStyle = "#ffffff";
+    context.lineWidth = 2 * ratio;
+    context.stroke();
+    drawLabel(context, textProp(feature, "SiteNameZh"), x + 11 * ratio,
+      y, ratio, "#6f2f20", 15);
   });
 
-  context.font = "700 " + (18 * ratio) + "px Arial, sans-serif";
-  context.strokeStyle = "rgba(255,255,255,.95)";
-  context.lineWidth = 5 * ratio;
-  context.strokeText(formatYear(currentYear()), 22 * ratio, 28 * ratio);
-  context.fillStyle = "#20383e";
-  context.fillText(formatYear(currentYear()), 22 * ratio, 28 * ratio);
+  drawLabel(context, formatYear(currentYear()), 22 * ratio, 28 * ratio,
+    ratio, "#20383e", 18);
 
   output.toBlob((blob) => {
     if (blob) {
@@ -503,27 +566,28 @@ function downloadSvg() {
   const map = state.map;
   const width = map.getContainer().clientWidth;
   const height = map.getContainer().clientHeight;
-
   const land = featurePaths(state.counties, "land");
   const counties = ui.showCounties.checked ? featurePaths(state.counties, "county") : "";
   const coast = featurePaths(state.coastline, "coastline");
-  const cultures = activeFeatures().map((feature) => {
-    const slug = safeId(textProp(feature, "Slug", feature.id || "culture"));
+  const radius = siteRadiusAtZoom(map.getZoom());
+  const seen = new Set();
+
+  const sites = activeFeatures().map((feature) => {
+    const siteId = textProp(feature, "SiteID", feature.id);
+    if (seen.has(siteId)) return "";
+    seen.add(siteId);
+    const point = map.project(feature.geometry.coordinates);
+    const slug = safeId(textProp(feature, "SiteSlug", siteId));
     const color = escapeXml(textProp(feature, "DisplayColor", COLORS.culture));
-    const lng = numberProp(feature, "LabelLongitude", Number.NaN);
-    const lat = numberProp(feature, "LabelLatitude", Number.NaN);
-    let label = "";
-    if (Number.isFinite(lng) && Number.isFinite(lat)) {
-      const point = map.project([lng, lat]);
-      label = '<text x="' + point.x.toFixed(2) + '" y="' + point.y.toFixed(2) + '">' +
-        escapeXml(textProp(feature, "TitleZh")) + '</text>';
-    }
-    return '<g id="culture-' + slug + '" data-start-year="' +
+    return '<g id="site-' + slug + '" data-culture="' +
+      escapeXml(textProp(feature, "CultureSlug")) + '" data-start-year="' +
       numberProp(feature, "StartYear") + '" data-end-year="' +
-      numberProp(feature, "EndYear") + '"><path d="' +
-      geometryPath(feature.geometry) + '" fill="' + color +
-      '" fill-opacity="0.44" stroke="' + color +
-      '" stroke-width="2" stroke-dasharray="7 5"/>' + label + '</g>';
+      numberProp(feature, "EndYear") + '"><circle cx="' +
+      point.x.toFixed(2) + '" cy="' + point.y.toFixed(2) + '" r="' +
+      radius.toFixed(2) + '" fill="' + color +
+      '" stroke="#ffffff" stroke-width="2"/><text x="' +
+      (point.x + 11).toFixed(2) + '" y="' + (point.y + 5).toFixed(2) + '">' +
+      escapeXml(textProp(feature, "SiteNameZh")) + "</text></g>";
   }).join("");
 
   const cities = ui.showCities.checked ? state.cities.features.map((feature) => {
@@ -532,27 +596,27 @@ function downloadSvg() {
       '"><circle cx="' + point.x.toFixed(2) + '" cy="' + point.y.toFixed(2) +
       '" r="4"/><text x="' + (point.x + 8).toFixed(2) + '" y="' +
       (point.y + 4).toFixed(2) + '">' + escapeXml(textProp(feature, "NameZh")) +
-      '</text></g>';
+      "</text></g>";
   }).join("") : "";
 
   const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + width +
     '" height="' + height + '" viewBox="0 0 ' + width + " " + height + '">\n' +
-    '<title>P118 先民地圖 — ' + escapeXml(formatYear(currentYear())) + '</title>\n' +
-    '<metadata>Generated by P118 V0.1 Static. Current Web Mercator viewport.</metadata>\n' +
-    '<g id="land" fill="' + COLORS.land + '" stroke="none" fill-rule="evenodd">' + land + '</g>\n' +
+    "<title>P118 先民地圖 — " + escapeXml(formatYear(currentYear())) + "</title>\n" +
+    "<metadata>Generated by P118 V0.2 Site Points. Current Web Mercator viewport.</metadata>\n" +
+    '<g id="land" fill="' + COLORS.land + '" stroke="none" fill-rule="evenodd">' + land + "</g>\n" +
     '<g id="modern-counties" fill="none" stroke="' + COLORS.county +
-    '" stroke-width="0.8">' + counties + '</g>\n' +
-    '<g id="historical-cultures" font-family="Noto Sans TC,Arial,sans-serif" font-size="16" font-weight="700" fill="#7c331f">' +
-    cultures + '</g>\n' +
+    '" stroke-width="0.8">' + counties + "</g>\n" +
+    '<g id="archaeological-sites" font-family="Noto Sans TC,Arial,sans-serif" font-size="15" font-weight="700" fill="#6f2f20">' +
+    sites + "</g>\n" +
     '<g id="coastline" fill="none" stroke="' + COLORS.coast +
-    '" stroke-width="1.35">' + coast + '</g>\n' +
+    '" stroke-width="1.35">' + coast + "</g>\n" +
     '<g id="cities" fill="' + COLORS.city +
     '" font-family="Noto Sans TC,Arial,sans-serif" font-size="14" font-weight="600">' +
-    cities + '</g>\n' +
+    cities + "</g>\n" +
     '<g id="annotations" fill="#20383e" font-family="Noto Sans TC,Arial,sans-serif" font-size="18" font-weight="700">' +
-    '<text x="22" y="30">' + escapeXml(formatYear(currentYear())) + '</text></g>\n' +
-    '</svg>';
+    '<text x="22" y="30">' + escapeXml(formatYear(currentYear())) + "</text></g>\n" +
+    "</svg>";
 
   downloadBlob(
     new Blob([svg], { type: "image/svg+xml;charset=utf-8" }),
@@ -563,20 +627,20 @@ function downloadSvg() {
 async function initialize() {
   setupEvents();
   try {
-    const [counties, coastline, cities, historical] = await Promise.all([
+    const [counties, coastline, cities, sites] = await Promise.all([
       fetchJson("./data/base/taiwan_counties.geojson"),
       fetchJson("./data/base/taiwan_coastline.geojson"),
       fetchJson("./data/base/taiwan_cities.geojson"),
-      fetchHistorical()
+      fetchTimelineSites()
     ]);
     state.counties = counties;
     state.coastline = coastline;
     state.cities = cities;
-    state.historical = historical.data;
-    state.sourceMode = historical.mode;
-    ui.dataStatus.textContent = historical.mode === "supabase"
-      ? "Supabase 正式資料"
-      : "V0.1 示意資料";
+    state.sites = sites.data;
+    state.sourceMode = sites.mode;
+    ui.dataStatus.textContent = sites.mode === "supabase"
+      ? "Supabase 遺址資料"
+      : "V0.2 本機示意資料";
     buildStops();
     updateTimeline();
     updateRecord(activeFeatures());
