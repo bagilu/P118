@@ -38,15 +38,17 @@
         <section class="panel timeline-panel" id="timelinePanel">
           <div class="section-title"><span>◷</span><div><small>TIME</small><h2>年代</h2></div></div>
           <output id="yearDisplay" class="year-display">BC 28,050</output>
+          <div id="bpDisplay" class="bp-display">換算約 30,000 BP</div>
           <input id="timeline" type="range" min="0" max="1" step="1" value="0" aria-label="年代">
           <div class="range-ends"><span id="firstYear">BC 28,050</span><span id="lastYear">BC 350</span></div>
-          <p class="hint">游標停在此區域時，可用滾輪切換年代節點。</p>
+          <p class="hint">在此區域滾動可連續穿越年代；接近遺址或全球事件時會自動減速並對準。Ctrl＋滾輪可精細移動。</p>
         </section>
 
         <section class="panel">
           <div class="section-title"><span>▱</span><div><small>LAYERS</small><h2>參考圖層</h2></div></div>
           <label class="toggle-row"><span><strong>現代縣市界</strong><small>僅供位置參考</small></span><input id="showCounties" type="checkbox"><i></i></label>
           <label class="toggle-row"><span><strong>主要城市</strong><small>六個現代城市位置</small></span><input id="showCities" type="checkbox" checked><i></i></label>
+          <label class="toggle-row"><span><strong>全球同期事件</strong><small>年代經過時淡入提示</small></span><input id="showContext" type="checkbox" checked><i></i></label>
         </section>
 
         <section class="panel compact">
@@ -57,7 +59,14 @@
       <section class="map-stage" aria-label="臺灣先民年代地圖">
         <div id="map"></div>
         <div id="loading" class="loading">正在準備地圖資料…</div>
-        <div class="year-chip"><small>目前年代</small><strong id="mapYear">BC 28,050</strong></div>
+        <div class="year-chip"><small>目前年代</small><strong id="mapYear">BC 28,050</strong><span id="mapBp">換算約 30,000 BP</span></div>
+        <article id="contextToast" class="context-toast" hidden aria-live="polite">
+          <small id="contextMeta">WORLD CONTEXT</small>
+          <h3 id="contextTitle"></h3>
+          <strong id="contextPeriod"></strong>
+          <p id="contextSummary"></p>
+          <a id="contextSource" target="_blank" rel="noopener">查看資料來源 ↗</a>
+        </article>
         <div class="legend"><span><i class="site-key"></i>考古遺址</span><span><i class="coast-key"></i>海岸線</span></div>
         <button id="resetMap" class="reset-button" type="button" aria-label="回到臺灣全圖" title="回到臺灣全圖">↺</button>
       </section>
@@ -68,7 +77,7 @@
           <div class="record-kind"><i id="cultureSwatch"></i><span id="recordStatus">示意資料</span></div>
           <h3 id="cultureTitle"></h3>
           <p id="cultureEnglish" class="english-title"></p>
-          <div class="period-box"><span>◷</span><div><small>年代範圍</small><strong id="culturePeriod"></strong></div></div>
+          <div class="period-box"><span>◷</span><div><small>年代範圍</small><strong id="culturePeriod"></strong><em id="culturePeriodBp"></em></div></div>
           <div class="site-box">
             <small>ARCHAEOLOGICAL SITE</small>
             <strong id="siteName"></strong>
@@ -81,11 +90,11 @@
           <div class="source site-source"><small>遺址資料來源</small><p id="siteSource"></p><a id="siteSourceLink" target="_blank" rel="noopener">開啟來源 ↗</a></div>
         </article>
         <div id="emptyRecord" class="empty-record" hidden>此年代尚無可顯示的文化資料。</div>
-        <div class="reading-note"><strong>閱讀提醒</strong><p>圓點表示考古遺址的定位，不表示遺址大小、文化分布半徑或文化疆域。</p></div>
+        <div class="reading-note"><strong>閱讀提醒</strong><p>圓點表示考古遺址的定位，不表示遺址大小、文化分布半徑或文化疆域。BP為以AD 1950為基準的近似換算；不等同特定標本的14C BP或cal BP定年。</p></div>
       </aside>
     </div>
 
-    <footer><span>P118 先民地圖 · V0.3.1 Evidence &amp; Sites</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
+    <footer><span>P118 先民地圖 · V0.4 Temporal Flow &amp; World Context</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
   </main>
   <script src="./app.js"></script>
 </body>

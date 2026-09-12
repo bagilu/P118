@@ -18,14 +18,23 @@ const state = {
   coastline: EMPTY,
   cities: EMPTY,
   sites: EMPTY,
+  contextEvents: [],
   stops: [-28050, -3050],
-  index: 0,
+  year: -28050,
+  minYear: -28050,
+  maxYear: -3050,
   selectedId: null,
   map: null,
   cityMarkers: [],
   siteMarkers: [],
   ready: false,
-  sourceMode: "loading"
+  sourceMode: "loading",
+  contextQueue: [],
+  contextShowing: false,
+  currentContext: null,
+  contextTimer: null,
+  renderFrame: null,
+  snapLockedUntil: 0
 };
 
 const el = (id) => document.getElementById(id);
@@ -33,11 +42,14 @@ const ui = {
   timeline: el("timeline"),
   timelinePanel: el("timelinePanel"),
   yearDisplay: el("yearDisplay"),
+  bpDisplay: el("bpDisplay"),
   mapYear: el("mapYear"),
+  mapBp: el("mapBp"),
   firstYear: el("firstYear"),
   lastYear: el("lastYear"),
   showCounties: el("showCounties"),
   showCities: el("showCities"),
+  showContext: el("showContext"),
   dataStatus: el("dataStatus"),
   loading: el("loading"),
   record: el("record"),
@@ -47,6 +59,7 @@ const ui = {
   cultureTitle: el("cultureTitle"),
   cultureEnglish: el("cultureEnglish"),
   culturePeriod: el("culturePeriod"),
+  culturePeriodBp: el("culturePeriodBp"),
   cultureSummary: el("cultureSummary"),
   cultureSource: el("cultureSource"),
   cultureSourceLink: el("cultureSourceLink"),
@@ -58,7 +71,13 @@ const ui = {
   siteSourceLink: el("siteSourceLink"),
   downloadPng: el("downloadPng"),
   downloadSvg: el("downloadSvg"),
-  resetMap: el("resetMap")
+  resetMap: el("resetMap"),
+  contextToast: el("contextToast"),
+  contextMeta: el("contextMeta"),
+  contextTitle: el("contextTitle"),
+  contextPeriod: el("contextPeriod"),
+  contextSummary: el("contextSummary"),
+  contextSource: el("contextSource")
 };
 
 function formatYear(year) {
@@ -68,7 +87,27 @@ function formatYear(year) {
 }
 
 function formatPeriod(start, end) {
+  if (start === end) return formatYear(start);
   return formatYear(start) + "–" + formatYear(end);
+}
+
+function bpFromYear(year) {
+  if (year < 0) return Math.abs(year) + 1950;
+  if (year > 0 && year <= 1950) return 1950 - year;
+  return null;
+}
+
+function formatBP(year) {
+  const bp = bpFromYear(year);
+  return bp == null ? "" : "換算約 " + bp.toLocaleString("en-US") + " BP";
+}
+
+function formatPeriodBP(start, end) {
+  const startBP = bpFromYear(start);
+  const endBP = bpFromYear(end);
+  if (startBP == null || endBP == null) return "";
+  return "換算約 " + startBP.toLocaleString("en-US") + "–" +
+    endBP.toLocaleString("en-US") + " BP";
 }
 
 function numberProp(feature, key, fallback = 0) {
@@ -161,8 +200,35 @@ async function fetchTimelineSites() {
   };
 }
 
+async function fetchContextEvents() {
+  const config = window.P118_CONFIG || {};
+  const url = String(config.SUPABASE_URL || "").trim().replace(/\/$/, "");
+  const key = String(config.SUPABASE_ANON_KEY || "").trim();
+
+  if (url && key) {
+    try {
+      const rpc = String(config.CONTEXT_RPC || "P118_GetContextEvents").trim();
+      const response = await fetch(url + "/rest/v1/rpc/" + rpc, {
+        method: "POST",
+        headers: {
+          apikey: key,
+          Authorization: "Bearer " + key,
+          "Content-Type": "application/json"
+        },
+        body: "{}"
+      });
+      if (!response.ok) throw new Error("Context HTTP " + response.status);
+      return await response.json();
+    } catch (error) {
+      console.warn("全球事件RPC尚未就緒，改用本機示範資料。", error);
+    }
+  }
+
+  return fetchJson("./data/demo/context_events.json");
+}
+
 function currentYear() {
-  return state.stops[state.index] ?? state.stops[0] ?? -28050;
+  return state.year;
 }
 
 function activeFeatures() {
@@ -171,26 +237,41 @@ function activeFeatures() {
 }
 
 function buildStops() {
-  const values = state.sites.features.flatMap((feature) => [
+  const siteValues = state.sites.features.flatMap((feature) => [
     numberProp(feature, "StartYear"),
     numberProp(feature, "EndYear")
   ]);
-  state.stops = [...new Set(values)].filter((year) => year !== 0).sort((a, b) => a - b);
+  const contextValues = state.contextEvents.flatMap((event) => [
+    Number(event.StartYear), Number(event.EndYear), Number(event.TriggerYear)
+  ]);
+  state.stops = [...new Set([...siteValues, ...contextValues])]
+    .filter((year) => Number.isFinite(year) && year !== 0)
+    .sort((a, b) => a - b);
   if (!state.stops.length) state.stops = [-28050, -3050];
-  state.index = 0;
-  ui.timeline.min = "0";
-  ui.timeline.max = String(Math.max(0, state.stops.length - 1));
-  ui.timeline.value = "0";
-  ui.timeline.disabled = state.stops.length < 2;
+  const allValues = [...siteValues, ...contextValues]
+    .filter((year) => Number.isFinite(year) && year !== 0);
+  state.minYear = Math.min(...allValues);
+  state.maxYear = Math.max(...allValues);
+  state.year = state.minYear;
+  ui.timeline.min = String(state.minYear);
+  ui.timeline.max = String(state.maxYear);
+  ui.timeline.step = "1";
+  ui.timeline.value = String(state.year);
+  ui.timeline.disabled = state.minYear >= state.maxYear;
 }
 
 function updateTimeline() {
   const year = currentYear();
   ui.yearDisplay.value = formatYear(year);
   ui.yearDisplay.textContent = formatYear(year);
+  ui.bpDisplay.textContent = formatBP(year);
+  ui.bpDisplay.hidden = !formatBP(year);
   ui.mapYear.textContent = formatYear(year);
-  ui.firstYear.textContent = formatYear(state.stops[0]);
-  ui.lastYear.textContent = formatYear(state.stops[state.stops.length - 1]);
+  ui.mapBp.textContent = formatBP(year);
+  ui.mapBp.hidden = !formatBP(year);
+  ui.firstYear.textContent = formatYear(state.minYear);
+  ui.lastYear.textContent = formatYear(state.maxYear);
+  ui.timeline.value = String(year);
 }
 
 function chooseSelected(features) {
@@ -227,6 +308,10 @@ function updateRecord(features) {
   ui.cultureTitle.textContent = textProp(feature, "TitleZh");
   ui.cultureEnglish.textContent = textProp(feature, "TitleEn");
   ui.culturePeriod.textContent = formatPeriod(
+    numberProp(feature, "StartYear"),
+    numberProp(feature, "EndYear")
+  );
+  ui.culturePeriodBp.textContent = formatPeriodBP(
     numberProp(feature, "StartYear"),
     numberProp(feature, "EndYear")
   );
@@ -275,6 +360,96 @@ function updateHistoricalLayer() {
   }
   updateTimeline();
   updateRecord(features);
+}
+
+function eventsCrossed(previousYear, nextYear) {
+  if (previousYear === nextYear || !ui.showContext.checked) return [];
+  const forward = nextYear > previousYear;
+  return state.contextEvents
+    .filter((event) => {
+      const trigger = Number(event.TriggerYear);
+      return forward
+        ? trigger > previousYear && trigger <= nextYear
+        : trigger < previousYear && trigger >= nextYear;
+    })
+    .sort((a, b) => forward
+      ? Number(a.TriggerYear) - Number(b.TriggerYear)
+      : Number(b.TriggerYear) - Number(a.TriggerYear));
+}
+
+function enqueueContextEvents(events) {
+  if (!events.length) return;
+  state.contextQueue.push(...events);
+  showNextContextEvent();
+}
+
+function showNextContextEvent() {
+  if (state.contextShowing || !state.contextQueue.length || !ui.showContext.checked) return;
+  const event = state.contextQueue.shift();
+  state.contextShowing = true;
+  state.currentContext = event;
+  ui.contextMeta.textContent = [event.RegionName, event.Category]
+    .filter(Boolean).join(" · ").toUpperCase();
+  ui.contextTitle.textContent = event.TitleZh;
+  ui.contextPeriod.textContent = formatPeriod(Number(event.StartYear), Number(event.EndYear));
+  ui.contextSummary.textContent = event.SummaryZh || "";
+  setSourceLink(ui.contextSource, event.SourceURL);
+  ui.contextToast.hidden = false;
+  ui.contextToast.classList.remove("is-leaving");
+  void ui.contextToast.offsetWidth;
+  ui.contextToast.classList.add("is-visible");
+  clearTimeout(state.contextTimer);
+  state.contextTimer = setTimeout(() => {
+    ui.contextToast.classList.remove("is-visible");
+    ui.contextToast.classList.add("is-leaving");
+    setTimeout(() => {
+      ui.contextToast.hidden = true;
+      ui.contextToast.classList.remove("is-leaving");
+      state.contextShowing = false;
+      state.currentContext = null;
+      showNextContextEvent();
+    }, 560);
+  }, 3300);
+}
+
+function setTimelineYear(targetYear, showCrossedEvents = true) {
+  const previousYear = state.year;
+  let nextYear = Math.round(Math.min(state.maxYear, Math.max(state.minYear, targetYear)));
+  if (nextYear === 0) nextYear = targetYear >= previousYear ? 1 : -1;
+  state.year = nextYear;
+  if (showCrossedEvents) enqueueContextEvents(eventsCrossed(previousYear, nextYear));
+  if (state.renderFrame) cancelAnimationFrame(state.renderFrame);
+  state.renderFrame = requestAnimationFrame(() => {
+    state.renderFrame = null;
+    updateHistoricalLayer();
+  });
+}
+
+function nextStop(direction) {
+  if (direction > 0) return state.stops.find((year) => year > state.year) ?? state.maxYear;
+  return [...state.stops].reverse().find((year) => year < state.year) ?? state.minYear;
+}
+
+function adaptiveStep(distance, precise) {
+  if (precise) return distance > 20 ? 5 : 1;
+  if (distance > 5000) return 500;
+  if (distance > 1000) return 100;
+  if (distance > 200) return 25;
+  if (distance > 50) return 10;
+  return 5;
+}
+
+function moveTimeline(direction, precise = false) {
+  if (Date.now() < state.snapLockedUntil) return;
+  const stop = nextStop(direction);
+  const distance = Math.abs(stop - state.year);
+  const step = adaptiveStep(distance, precise);
+  const candidate = state.year + direction * step;
+  const target = direction > 0 ? Math.min(candidate, stop) : Math.max(candidate, stop);
+  setTimelineYear(target, true);
+  if (target === stop && stop !== state.minYear && stop !== state.maxYear) {
+    state.snapLockedUntil = Date.now() + (precise ? 320 : 720);
+  }
 }
 
 function createCityMarkers() {
@@ -385,20 +560,27 @@ function resetMap(animate = true) {
 
 function setupEvents() {
   ui.timeline.addEventListener("input", () => {
-    state.index = Number(ui.timeline.value);
-    updateHistoricalLayer();
+    setTimelineYear(Number(ui.timeline.value), false);
   });
 
   let lastWheel = 0;
   ui.timelinePanel.addEventListener("wheel", (event) => {
     event.preventDefault();
+    event.stopPropagation();
     const now = Date.now();
-    if (now - lastWheel < 180 || state.stops.length < 2) return;
+    if (now - lastWheel < 48 || state.stops.length < 2) return;
     lastWheel = now;
     const direction = event.deltaY > 0 ? 1 : -1;
-    state.index = Math.min(state.stops.length - 1, Math.max(0, state.index + direction));
-    ui.timeline.value = String(state.index);
-    updateHistoricalLayer();
+    moveTimeline(direction, event.ctrlKey);
+  }, { passive: false });
+
+  document.addEventListener("wheel", (event) => {
+    if (!event.ctrlKey || ui.timelinePanel.contains(event.target)) return;
+    event.preventDefault();
+    const now = Date.now();
+    if (now - lastWheel < 48 || state.stops.length < 2) return;
+    lastWheel = now;
+    moveTimeline(event.deltaY > 0 ? 1 : -1, true);
   }, { passive: false });
 
   ui.showCounties.addEventListener("change", () => {
@@ -421,6 +603,16 @@ function setupEvents() {
     state.cityMarkers.forEach((marker) => {
       marker.getElement().style.display = ui.showCities.checked ? "block" : "none";
     });
+  });
+
+  ui.showContext.addEventListener("change", () => {
+    if (ui.showContext.checked) return;
+    state.contextQueue = [];
+    clearTimeout(state.contextTimer);
+    state.contextShowing = false;
+    state.currentContext = null;
+    ui.contextToast.hidden = true;
+    ui.contextToast.classList.remove("is-visible", "is-leaving");
   });
 
   ui.resetMap.addEventListener("click", () => resetMap(true));
@@ -508,6 +700,20 @@ async function downloadPng() {
 
   drawLabel(context, formatYear(currentYear()), 22 * ratio, 28 * ratio,
     ratio, "#20383e", 18);
+  const bpLabel = formatBP(currentYear());
+  if (bpLabel) {
+    drawLabel(context, bpLabel, 22 * ratio, 50 * ratio,
+      ratio, "#5e7478", 11);
+  }
+  if (state.currentContext && ui.showContext.checked) {
+    context.textAlign = "right";
+    drawLabel(context, state.currentContext.TitleZh,
+      output.width - 22 * ratio, 28 * ratio, ratio, "#9e3f2d", 16);
+    drawLabel(context,
+      formatPeriod(Number(state.currentContext.StartYear), Number(state.currentContext.EndYear)),
+      output.width - 22 * ratio, 50 * ratio, ratio, "#52696d", 11);
+    context.textAlign = "start";
+  }
 
   output.toBlob((blob) => {
     if (blob) {
@@ -571,6 +777,7 @@ function downloadSvg() {
   const coast = featurePaths(state.coastline, "coastline");
   const radius = siteRadiusAtZoom(map.getZoom());
   const seen = new Set();
+  const bpLabel = formatBP(currentYear());
 
   const sites = activeFeatures().map((feature) => {
     const siteId = textProp(feature, "SiteID", feature.id);
@@ -599,11 +806,20 @@ function downloadSvg() {
       "</text></g>";
   }).join("") : "";
 
+  const contextAnnotation = state.currentContext && ui.showContext.checked
+    ? '<g id="world-context" text-anchor="end"><text x="' + (width - 22) +
+      '" y="30" font-size="16" fill="#9e3f2d">' +
+      escapeXml(state.currentContext.TitleZh) + '</text><text x="' + (width - 22) +
+      '" y="50" font-size="11" fill="#52696d">' +
+      escapeXml(formatPeriod(Number(state.currentContext.StartYear), Number(state.currentContext.EndYear))) +
+      '</text></g>\n'
+    : "";
+
   const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + width +
     '" height="' + height + '" viewBox="0 0 ' + width + " " + height + '">\n' +
     "<title>P118 先民地圖 — " + escapeXml(formatYear(currentYear())) + "</title>\n" +
-    "<metadata>Generated by P118 V0.3.1 Evidence &amp; Sites. Current Web Mercator viewport.</metadata>\n" +
+    "<metadata>Generated by P118 V0.4 Temporal Flow &amp; World Context. Current Web Mercator viewport.</metadata>\n" +
     '<g id="land" fill="' + COLORS.land + '" stroke="none" fill-rule="evenodd">' + land + "</g>\n" +
     '<g id="modern-counties" fill="none" stroke="' + COLORS.county +
     '" stroke-width="0.8">' + counties + "</g>\n" +
@@ -615,7 +831,9 @@ function downloadSvg() {
     '" font-family="Noto Sans TC,Arial,sans-serif" font-size="14" font-weight="600">' +
     cities + "</g>\n" +
     '<g id="annotations" fill="#20383e" font-family="Noto Sans TC,Arial,sans-serif" font-size="18" font-weight="700">' +
-    '<text x="22" y="30">' + escapeXml(formatYear(currentYear())) + "</text></g>\n" +
+    '<text x="22" y="30">' + escapeXml(formatYear(currentYear())) + '</text>' +
+    (bpLabel ? '<text x="22" y="50" font-size="11" fill="#5e7478">' + escapeXml(bpLabel) + '</text>' : '') +
+    "</g>\n" + contextAnnotation +
     "</svg>";
 
   downloadBlob(
@@ -627,20 +845,22 @@ function downloadSvg() {
 async function initialize() {
   setupEvents();
   try {
-    const [counties, coastline, cities, sites] = await Promise.all([
+    const [counties, coastline, cities, sites, contextEvents] = await Promise.all([
       fetchJson("./data/base/taiwan_counties.geojson"),
       fetchJson("./data/base/taiwan_coastline.geojson"),
       fetchJson("./data/base/taiwan_cities.geojson"),
-      fetchTimelineSites()
+      fetchTimelineSites(),
+      fetchContextEvents()
     ]);
     state.counties = counties;
     state.coastline = coastline;
     state.cities = cities;
     state.sites = sites.data;
+    state.contextEvents = Array.isArray(contextEvents) ? contextEvents : [];
     state.sourceMode = sites.mode;
     ui.dataStatus.textContent = sites.mode === "supabase"
       ? "Supabase 遺址資料"
-      : "V0.2 本機示意資料";
+      : "V0.4 本機示意資料";
     buildStops();
     updateTimeline();
     updateRecord(activeFeatures());

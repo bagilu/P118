@@ -1,10 +1,10 @@
-# P118 Supabase 資料庫安裝（V0.3 證據與遺址版）
+# P118 Supabase 資料庫安裝（V0.4 時間流動與全球同期事件）
 
 本目錄採 P-SDS 分段 SQL。所有自訂物件均使用 P118 前綴，避免影響同一個 Supabase Project 中的其他系統。
 
 ## 安裝或升級
 
-全新安裝時，依檔名前綴順序，在 Supabase SQL Editor 執行 `01` 至 `09`。
+全新安裝時，依檔名前綴順序，在 Supabase SQL Editor 執行 `01` 至 `11`。
 
 若已完成V0.2的01至08，只需再執行 `09_AddEvidenceAndSites.sql`。
 
@@ -12,6 +12,8 @@
 - 從 V0.1 升級：新增 V0.2 物件，保留舊多邊形資料表與舊 RPC。
 - `08_SeedData.sql`：寫入長濱、牛罵頭、卑南三個文化，以及八仙洞、小馬、牛罵頭、卑南四個遺址點。
 - `09_AddEvidenceAndSites.sql`：增加位置品質及證據欄位，擴充為17個文化—遺址關聯。
+- `10_AddDapenkengCulture.sql`：加入大坌坑文化8處遺址及遺址個別年代。
+- `11_AddWorldContext.sql`：建立全球同期事件資料表、讀取RPC與10筆示範資料。
 
 V0.2 的點位架構不需要 PostGIS。若 V0.1 已啟用 PostGIS，不必停用；其他專案可能仍會使用它。
 
@@ -34,12 +36,17 @@ Latitude：緯度，範圍 -90 至 90
 
 建立文化與遺址的多對多關聯。同一遺址若有不同文化層，可建立多筆關聯，不必重複保存經緯度。
 
+### TblP118ContextEvent
+
+保存全球同期人物、建築、文字與政治事件。`TriggerYear`控制淡入提示的觸發年代。
+
 ## 網站連線
 
 `config.js` 必須使用：
 
 ```js
-TIMELINE_RPC: "P118_GetTimelineSites"
+TIMELINE_RPC: "P118_GetTimelineSites",
+CONTEXT_RPC: "P118_GetContextEvents"
 ```
 
 瀏覽器只能使用 Supabase publishable/anon key，不可使用 `service_role` key。

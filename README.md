@@ -1,8 +1,14 @@
-# P118 先民地圖 V0.3.1（證據與遺址版）
+# P118 先民地圖 V0.4（時間流動與全球同期事件）
 
 本版將主要呈現方式由推定文化多邊形改為考古遺址點位。網站可直接放在 GitHub Pages，不需要 Node.js、npm 或編譯程序；Repository 根目錄直接包含 `index.html`。
 
-## V0.3.1 重點
+## V0.4 重點
+
+- 主年代維持BC／AD，並自動顯示以AD 1950為基準的近似BP換算。
+- 年代拉桿改為逐年連續值；滾輪依距離下一事件自動變速、磁吸並短暫停留。
+- Ctrl＋滾輪採1年或5年的精細移動；游標在地圖上時，一般滾輪仍用於地圖縮放。
+- 新增全球同期事件淡入卡，可關閉並可開啟證據來源。
+- 第一批全球事件共10筆，涵蓋BC9600至BC221。
 
 - 文化資料與考古遺址資料分開管理。
 - 經緯度直接保存為 `Longitude`、`Latitude` 數字，不需編寫 WKT、GeoJSON 或 EWKB。
@@ -24,15 +30,17 @@
 
 ## 資料庫安裝或升級
 
-全新安裝請在 Supabase SQL Editor 依序執行 `Database/01_CreateTables.sql` 至 `09_AddEvidenceAndSites.sql`。
+全新安裝請在 Supabase SQL Editor 依序執行 `Database/01_CreateTables.sql` 至 `11_AddWorldContext.sql`。
 
-已完成 V0.2 的01至08者，只需再執行 `Database/09_AddEvidenceAndSites.sql`，不必重跑01至08。
+已完成V0.3.1且大坌坑文化已正常顯示者，只需執行 `Database/11_AddWorldContext.sql`。
 
 升級會新增：
 
 - `TblP118ArchaeologicalSite`
 - `TblP118EntitySite`
+- `TblP118ContextEvent`
 - `P118_GetTimelineSites()`
+- `P118_GetContextEvents()`
 
 既有的 `TblP118HistoricalGeometry`、多邊形資料及舊 RPC 不會被刪除或修改，但 V0.2 網站不會再讀取它們。
 
@@ -44,7 +52,8 @@
 window.P118_CONFIG = {
   SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
   SUPABASE_ANON_KEY: "YOUR_PUBLISHABLE_OR_ANON_KEY",
-  TIMELINE_RPC: "P118_GetTimelineSites"
+  TIMELINE_RPC: "P118_GetTimelineSites",
+  CONTEXT_RPC: "P118_GetContextEvents"
 };
 ```
 
@@ -64,7 +73,7 @@ IsPublished   是否公開
 
 ## P-SDS 隔離範圍
 
-01–09 只操作名稱帶有 P118 的資料表、View、Function、Policy、Index 與 Constraint。不建立或刪除 schema、不變更 public schema 整體權限，也不操作其他 P 系列專案物件。
+01–11 只操作名稱帶有 P118 的資料表、View、Function、Policy、Index 與 Constraint。不建立或刪除 schema、不變更 public schema 整體權限，也不操作其他 P 系列專案物件。
 
 ## 圖資與研究限制
 
@@ -72,6 +81,7 @@ IsPublished   是否公開
 - 城市點：Natural Earth Populated Places。
 - 海岸線：由縣市界幾何合併產生，以維持岸線與陸域貼合。
 - 遺址圓點只表示定位，不等於遺址邊界、文化涵蓋範圍或政治疆界。
+- BP是由BC／AD依1950基準產生的閱讀輔助，不等於特定標本的14C BP或cal BP測定結果。
 - 小馬洞穴目前為展示用概略座標，正式研究使用前須再校訂。
 
 地圖引擎使用固定版本 MapLibre GL JS 5.9.0，由 unpkg CDN 載入。

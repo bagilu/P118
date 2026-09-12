@@ -3,5 +3,6 @@
 window.P118_CONFIG = {
   SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
   SUPABASE_ANON_KEY: "YOUR_PUBLISHABLE_OR_ANON_KEY",
-  TIMELINE_RPC: "P118_GetTimelineSites"
+  TIMELINE_RPC: "P118_GetTimelineSites",
+  CONTEXT_RPC: "P118_GetContextEvents"
 };
