@@ -1,49 +1,76 @@
-# P118 Supabase 資料庫安裝（V0.3 證據與遺址版）
+# P118 先民地圖 V0.3（證據與遺址版）
 
-本目錄採 P-SDS 分段 SQL。所有自訂物件均使用 P118 前綴，避免影響同一個 Supabase Project 中的其他系統。
+本版將主要呈現方式由推定文化多邊形改為考古遺址點位。網站可直接放在 GitHub Pages，不需要 Node.js、npm 或編譯程序；Repository 根目錄直接包含 `index.html`。
 
-## 安裝或升級
+## V0.3 重點
 
-全新安裝時，依檔名前綴順序，在 Supabase SQL Editor 執行 `01` 至 `09`。
+- 文化資料與考古遺址資料分開管理。
+- 經緯度直接保存為 `Longitude`、`Latitude` 數字，不需編寫 WKT、GeoJSON 或 EWKB。
+- 同一文化可連結多個遺址；同一遺址也可連結多個文化層。
+- 地圖圓點大小隨縮放層級調整，但圓點不表示遺址面積或文化範圍。
+- 年代拉桿、滑鼠滾輪、透明 PNG、可編輯 SVG、現代縣市界及城市圖層均保留。
+- SVG 中每個遺址均為獨立的 `<circle>` 與 `<text>`，可在向量軟體中編輯。
+- 加入縣市、鄉鎮市區、位置精度，以及文化—遺址關係的證據狀態與來源。
+- 第一批收入長濱文化2處、牛罵頭文化9處、卑南文化6處，共17個文化—遺址關聯。
+- 網站左上角標示「慈濟大學 經營管理學系 好玩實驗室 作品」。
 
-若已完成V0.2的01至08，只需再執行 `09_AddEvidenceAndSites.sql`。
+## GitHub Pages
 
-- 全新安裝：建立文化、遺址及文化—遺址關聯資料。
-- 從 V0.1 升級：新增 V0.2 物件，保留舊多邊形資料表與舊 RPC。
-- `08_SeedData.sql`：寫入長濱、牛罵頭、卑南三個文化，以及八仙洞、小馬、牛罵頭、卑南四個遺址點。
-- `09_AddEvidenceAndSites.sql`：增加位置品質及證據欄位，擴充為17個文化—遺址關聯。
+1. 將 ZIP 解壓縮。
+2. 把解壓縮後資料夾內的所有內容上傳至 GitHub repository 根目錄。
+3. 確認 repository 首頁直接看得到 `index.html`。
+4. 到 Settings → Pages，選擇 `Deploy from a branch`、`main`、`/(root)`。
 
-V0.2 的點位架構不需要 PostGIS。若 V0.1 已啟用 PostGIS，不必停用；其他專案可能仍會使用它。
+## 資料庫安裝或升級
 
-## 主要資料表
+全新安裝請在 Supabase SQL Editor 依序執行 `Database/01_CreateTables.sql` 至 `09_AddEvidenceAndSites.sql`。
 
-### TblP118HistoricalEntity
+已完成 V0.2 的01至08者，只需再執行 `Database/09_AddEvidenceAndSites.sql`，不必重跑01至08。
 
-保存文化名稱、BC/AD 起訖年、文字說明、來源及顯示顏色。
+升級會新增：
 
-### TblP118ArchaeologicalSite
+- `TblP118ArchaeologicalSite`
+- `TblP118EntitySite`
+- `P118_GetTimelineSites()`
 
-保存遺址名稱及可直接閱讀、編輯的經緯度：
+既有的 `TblP118HistoricalGeometry`、多邊形資料及舊 RPC 不會被刪除或修改，但 V0.2 網站不會再讀取它們。
 
-```text
-Longitude：經度，範圍 -180 至 180
-Latitude：緯度，範圍 -90 至 90
-```
+## Supabase 連線
 
-### TblP118EntitySite
-
-建立文化與遺址的多對多關聯。同一遺址若有不同文化層，可建立多筆關聯，不必重複保存經緯度。
-
-## 網站連線
-
-`config.js` 必須使用：
+將 `config-sample.js` 複製為 `config.js`，再填入 Project URL 與 publishable/anon key。不可使用 `service_role` key。新版ZIP不包含實際 `config.js`，因此不會覆蓋網站上既有的連線設定。
 
 ```js
-TIMELINE_RPC: "P118_GetTimelineSites"
+window.P118_CONFIG = {
+  SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
+  SUPABASE_ANON_KEY: "YOUR_PUBLISHABLE_OR_ANON_KEY",
+  TIMELINE_RPC: "P118_GetTimelineSites"
+};
 ```
 
-瀏覽器只能使用 Supabase publishable/anon key，不可使用 `service_role` key。
+## 自行新增遺址
 
-## 安全範圍
+可直接在 Supabase Table Editor 的 `TblP118ArchaeologicalSite` 新增資料。最重要的欄位是：
 
-SQL 不會刪除 V0.1 的 `TblP118HistoricalGeometry`，也不會刪除舊資料。所有建立、修改與授權均明確限定於 P118 物件。
+```text
+Slug          唯一英文代碼
+SiteNameZh    中文遺址名稱
+Longitude     經度，例如 121.476676
+Latitude      緯度，例如 23.397167
+IsPublished   是否公開
+```
+
+新增遺址後，還需在 `TblP118EntitySite` 建立它與文化的關聯，網站才會顯示。
+
+## P-SDS 隔離範圍
+
+01–09 只操作名稱帶有 P118 的資料表、View、Function、Policy、Index 與 Constraint。不建立或刪除 schema、不變更 public schema 整體權限，也不操作其他 P 系列專案物件。
+
+## 圖資與研究限制
+
+- 縣市界：內政部國土測繪中心公開資料，原始檔日期 114-03-18。
+- 城市點：Natural Earth Populated Places。
+- 海岸線：由縣市界幾何合併產生，以維持岸線與陸域貼合。
+- 遺址圓點只表示定位，不等於遺址邊界、文化涵蓋範圍或政治疆界。
+- 小馬洞穴目前為展示用概略座標，正式研究使用前須再校訂。
+
+地圖引擎使用固定版本 MapLibre GL JS 5.9.0，由 unpkg CDN 載入。
