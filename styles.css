@@ -39,6 +39,28 @@ button:disabled { cursor: wait; opacity: .55; }
   border-bottom: 4px solid var(--accent);
 }
 .brand { display: flex; align-items: center; gap: .85rem; }
+.brand-copy { min-width: 0; }
+.lab-credit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem .55rem;
+  margin-bottom: .3rem;
+  color: #dce7e5;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1.25;
+}
+.lab-credit a {
+  color: #f2b291;
+  text-decoration: none;
+  border-bottom: 1px solid rgb(242 178 145 / 55%);
+}
+.lab-credit a:hover,
+.lab-credit a:focus-visible {
+  color: #ffffff;
+  border-bottom-color: #ffffff;
+}
 .brand small, .section-title small, .year-chip small, .period-box small, .source small, .status-box small {
   display: block;
   color: #75878a;
@@ -193,6 +215,7 @@ footer { min-height: 34px; display: flex; align-items: center; justify-content: 
 @media (max-width: 650px) {
   .topbar { align-items: flex-start; padding: .8rem; }
   .brand-symbol { display: none; }
+  .lab-credit { max-width: 230px; font-size: .65rem; }
   .brand h1 { font-size: 1.35rem; }
   .button { min-width: 42px; padding-inline: .55rem; font-size: 0; }
   .button::first-letter { font-size: 1.25rem; }
