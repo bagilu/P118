@@ -116,6 +116,25 @@ button:disabled { cursor: wait; opacity: .55; }
 .bp-display { margin: -.75rem 0 1rem; color: #6f8386; font-size: .82rem; font-weight: 700; }
 #timeline { width: 100%; accent-color: var(--accent); cursor: ew-resize; }
 .range-ends { display: flex; justify-content: space-between; margin-top: .55rem; color: var(--ink-soft); font-size: .8rem; font-weight: 700; }
+.playback-controls { display: grid; grid-template-columns: 1fr .72fr 1fr; gap: .35rem; margin-top: 1rem; }
+.playback-controls button {
+  min-height: 34px;
+  padding: .35rem .4rem;
+  border: 1px solid #aebdba;
+  border-radius: 2px;
+  color: var(--ink);
+  background: #edf0eb;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.playback-controls button span { margin: 0 .22rem; }
+.playback-controls button:hover { border-color: var(--accent); background: #f4e6de; }
+.playback-controls button.is-active { color: #fff; border-color: var(--accent); background: var(--accent); }
+.playback-controls button:focus-visible,
+.playback-options select:focus-visible { outline: 3px solid rgb(208 106 66 / 30%); outline-offset: 2px; }
+.playback-options { display: flex; align-items: center; gap: .45rem; margin-top: .55rem; color: #667a7d; font-size: .72rem; font-weight: 700; }
+.playback-options select { min-height: 30px; padding: .15rem .35rem; border: 1px solid #b8c5c2; border-radius: 2px; color: var(--ink); background: #f8f8f3; }
+.playback-options output { margin-left: auto; color: var(--accent-dark); }
 .hint { margin: .95rem 0 0; padding-left: .7rem; border-left: 2px solid var(--accent); color: #66777a; font-size: .82rem; line-height: 1.55; }
 .toggle-row {
   min-height: 64px;
@@ -182,14 +201,18 @@ button:disabled { cursor: wait; opacity: .55; }
   padding: 1rem 1.1rem;
   border-top: 3px solid var(--accent);
   color: var(--ink);
-  background: rgb(248 248 243 / 96%);
-  box-shadow: 0 10px 30px rgb(32 56 62 / 22%);
+  background: rgb(248 248 243 / 82%);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 8px 24px rgb(32 56 62 / 17%);
   opacity: 0;
   transform: translateY(-10px);
   pointer-events: none;
 }
 .context-toast.is-visible { animation: context-in .45s ease forwards; pointer-events: auto; }
 .context-toast.is-leaving { animation: context-out .55s ease forwards; }
+.context-toast:hover,
+.context-toast:focus-within { background: rgb(248 248 243 / 96%); }
 .context-toast small { color: var(--accent-dark); font-size: .66rem; font-weight: 800; letter-spacing: .12em; }
 .context-toast h3 { margin: .45rem 0 .2rem; font: 700 1.25rem/1.25 Georgia, "Noto Serif TC", serif; }
 .context-toast > strong { color: #52696d; font: 700 .9rem Georgia, serif; }

@@ -41,6 +41,20 @@
           <div id="bpDisplay" class="bp-display">換算約 30,000 BP</div>
           <input id="timeline" type="range" min="0" max="1" step="1" value="0" aria-label="年代">
           <div class="range-ends"><span id="firstYear">BC 28,050</span><span id="lastYear">BC 350</span></div>
+          <div class="playback-controls" aria-label="年代自動播放">
+            <button id="playPast" type="button" title="自動往古代移動" aria-label="自動往古代移動">◀<span>往古代</span></button>
+            <button id="pausePlayback" type="button" title="暫停年代播放" aria-label="暫停年代播放">Ⅱ<span>暫停</span></button>
+            <button id="playFuture" type="button" title="自動往現代移動" aria-label="自動往現代移動"><span>往現代</span>▶</button>
+          </div>
+          <div class="playback-options">
+            <label for="playbackSpeed">速度</label>
+            <select id="playbackSpeed">
+              <option value="slow">慢速</option>
+              <option value="normal" selected>標準</option>
+              <option value="fast">快速</option>
+            </select>
+            <output id="playbackStatus">人工操作</output>
+          </div>
           <p class="hint">在此區域滾動可連續穿越年代；接近遺址或全球事件時會自動減速並對準。Ctrl＋滾輪可精細移動。</p>
         </section>
 
@@ -94,7 +108,7 @@
       </aside>
     </div>
 
-    <footer><span>P118 先民地圖 · V0.4 Temporal Flow &amp; World Context</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
+    <footer><span>P118 先民地圖 · V0.4.1 Guided Time Playback</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
   </main>
   <script src="./app.js"></script>
 </body>
