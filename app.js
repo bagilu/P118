@@ -29,18 +29,27 @@ const state = {
   siteMarkers: [],
   ready: false,
   sourceMode: "loading",
-  contextQueue: [],
   contextShowing: false,
   currentContext: null,
-  contextTimer: null,
+  contextFadeTimer: null,
+  movementIdleTimer: null,
+  movementStartedAt: null,
+  contextHovered: false,
   renderFrame: null,
-  snapLockedUntil: 0
+  snapLockedUntil: 0,
+  playbackDirection: 0,
+  lastPlaybackDirection: 1,
+  playbackTimer: null,
+  playbackSpeed: "normal"
 };
 
 const el = (id) => document.getElementById(id);
 const ui = {
   timeline: el("timeline"),
+  timelineMarks: el("timelineMarks"),
   timelinePanel: el("timelinePanel"),
+  timelineHelpButton: el("timelineHelpButton"),
+  timelineHelp: el("timelineHelp"),
   yearDisplay: el("yearDisplay"),
   bpDisplay: el("bpDisplay"),
   mapYear: el("mapYear"),
@@ -77,7 +86,12 @@ const ui = {
   contextTitle: el("contextTitle"),
   contextPeriod: el("contextPeriod"),
   contextSummary: el("contextSummary"),
-  contextSource: el("contextSource")
+  contextSource: el("contextSource"),
+  playPast: el("playPast"),
+  pausePlayback: el("pausePlayback"),
+  playFuture: el("playFuture"),
+  playbackSpeed: el("playbackSpeed"),
+  playbackStatus: el("playbackStatus")
 };
 
 function formatYear(year) {
@@ -258,6 +272,44 @@ function buildStops() {
   ui.timeline.step = "1";
   ui.timeline.value = String(state.year);
   ui.timeline.disabled = state.minYear >= state.maxYear;
+  renderTimelineMarks(siteValues, contextValues);
+}
+
+function renderTimelineMarks(siteValues, contextValues) {
+  const marks = new Map();
+  const addMark = (year, kind) => {
+    if (!Number.isFinite(year) || year === 0) return;
+    const current = marks.get(year) || { site: 0, context: 0 };
+    current[kind] += 1;
+    marks.set(year, current);
+  };
+
+  siteValues.forEach((year) => addMark(year, "site"));
+  contextValues.forEach((year) => addMark(year, "context"));
+  ui.timelineMarks.replaceChildren();
+
+  const range = state.maxYear - state.minYear;
+  if (range <= 0) return;
+
+  [...marks.entries()].sort((a, b) => a[0] - b[0]).forEach(([year, counts]) => {
+    const mark = document.createElement("span");
+    const percentage = ((year - state.minYear) / range) * 100;
+    const total = counts.site + counts.context;
+    mark.className = "timeline-mark";
+    if (counts.site && counts.context) mark.classList.add("is-mixed");
+    else if (counts.context) mark.classList.add("is-context");
+    if (total >= 3) mark.classList.add("is-dense");
+    mark.style.left = percentage.toFixed(6) + "%";
+    mark.dataset.year = String(year);
+    mark.title = formatYear(year) + "｜" + total + "筆資料";
+    ui.timelineMarks.appendChild(mark);
+  });
+}
+
+function updateTimelineMarks(year) {
+  ui.timelineMarks.querySelectorAll(".timeline-mark").forEach((mark) => {
+    mark.classList.toggle("is-current", Number(mark.dataset.year) === year);
+  });
 }
 
 function updateTimeline() {
@@ -272,6 +324,7 @@ function updateTimeline() {
   ui.firstYear.textContent = formatYear(state.minYear);
   ui.lastYear.textContent = formatYear(state.maxYear);
   ui.timeline.value = String(year);
+  updateTimelineMarks(year);
 }
 
 function chooseSelected(features) {
@@ -377,15 +430,31 @@ function eventsCrossed(previousYear, nextYear) {
       : Number(b.TriggerYear) - Number(a.TriggerYear));
 }
 
-function enqueueContextEvents(events) {
-  if (!events.length) return;
-  state.contextQueue.push(...events);
-  showNextContextEvent();
+function hideContextEvent(immediate = false) {
+  clearTimeout(state.contextFadeTimer);
+  if (immediate) {
+    ui.contextToast.hidden = true;
+    ui.contextToast.classList.remove("is-visible", "is-leaving");
+    state.contextShowing = false;
+    state.currentContext = null;
+    return;
+  }
+  if (!state.contextShowing) return;
+  ui.contextToast.classList.remove("is-visible");
+  ui.contextToast.classList.add("is-leaving");
+  state.contextFadeTimer = setTimeout(() => {
+    ui.contextToast.hidden = true;
+    ui.contextToast.classList.remove("is-leaving");
+    state.contextShowing = false;
+    state.currentContext = null;
+  }, 560);
 }
 
-function showNextContextEvent() {
-  if (state.contextShowing || !state.contextQueue.length || !ui.showContext.checked) return;
-  const event = state.contextQueue.shift();
+function showContextEvent(event) {
+  if (!event || !ui.showContext.checked) return;
+  clearTimeout(state.contextFadeTimer);
+  clearTimeout(state.movementIdleTimer);
+  state.movementStartedAt = null;
   state.contextShowing = true;
   state.currentContext = event;
   ui.contextMeta.textContent = [event.RegionName, event.Category]
@@ -395,34 +464,40 @@ function showNextContextEvent() {
   ui.contextSummary.textContent = event.SummaryZh || "";
   setSourceLink(ui.contextSource, event.SourceURL);
   ui.contextToast.hidden = false;
-  ui.contextToast.classList.remove("is-leaving");
+  ui.contextToast.classList.remove("is-visible", "is-leaving");
   void ui.contextToast.offsetWidth;
   ui.contextToast.classList.add("is-visible");
-  clearTimeout(state.contextTimer);
-  state.contextTimer = setTimeout(() => {
-    ui.contextToast.classList.remove("is-visible");
-    ui.contextToast.classList.add("is-leaving");
-    setTimeout(() => {
-      ui.contextToast.hidden = true;
-      ui.contextToast.classList.remove("is-leaving");
-      state.contextShowing = false;
-      state.currentContext = null;
-      showNextContextEvent();
-    }, 560);
-  }, 3300);
+}
+
+function noteTimelineMovement() {
+  if (!state.currentContext || !ui.showContext.checked) return;
+  const now = Date.now();
+  if (state.movementStartedAt == null) state.movementStartedAt = now;
+  clearTimeout(state.movementIdleTimer);
+  state.movementIdleTimer = setTimeout(() => {
+    state.movementStartedAt = null;
+  }, 900);
+  if (now - state.movementStartedAt >= 3000 && !state.contextHovered) {
+    state.movementStartedAt = null;
+    hideContextEvent(false);
+  }
 }
 
 function setTimelineYear(targetYear, showCrossedEvents = true) {
   const previousYear = state.year;
   let nextYear = Math.round(Math.min(state.maxYear, Math.max(state.minYear, targetYear)));
   if (nextYear === 0) nextYear = targetYear >= previousYear ? 1 : -1;
+  if (nextYear === previousYear) return false;
   state.year = nextYear;
-  if (showCrossedEvents) enqueueContextEvents(eventsCrossed(previousYear, nextYear));
+  const crossed = showCrossedEvents ? eventsCrossed(previousYear, nextYear) : [];
+  if (crossed.length) showContextEvent(crossed[0]);
+  else noteTimelineMovement();
   if (state.renderFrame) cancelAnimationFrame(state.renderFrame);
   state.renderFrame = requestAnimationFrame(() => {
     state.renderFrame = null;
     updateHistoricalLayer();
   });
+  return true;
 }
 
 function nextStop(direction) {
@@ -439,17 +514,80 @@ function adaptiveStep(distance, precise) {
   return 5;
 }
 
-function moveTimeline(direction, precise = false) {
-  if (Date.now() < state.snapLockedUntil) return;
+function moveTimeline(direction, precise = false, isAuto = false) {
+  if (Date.now() < state.snapLockedUntil) return false;
   const stop = nextStop(direction);
   const distance = Math.abs(stop - state.year);
   const step = adaptiveStep(distance, precise);
   const candidate = state.year + direction * step;
   const target = direction > 0 ? Math.min(candidate, stop) : Math.max(candidate, stop);
-  setTimelineYear(target, true);
+  if (!setTimelineYear(target, true)) return false;
   if (target === stop && stop !== state.minYear && stop !== state.maxYear) {
-    state.snapLockedUntil = Date.now() + (precise ? 320 : 720);
+    const isContextStop = state.contextEvents.some(
+      (event) => Number(event.TriggerYear) === stop
+    );
+    const pauseDuration = isAuto
+      ? (isContextStop ? 3000 : 900)
+      : (precise ? 320 : 720);
+    state.snapLockedUntil = Date.now() + pauseDuration;
   }
+  return true;
+}
+
+function playbackInterval() {
+  return { slow: 200, normal: 110, fast: 55 }[state.playbackSpeed] || 110;
+}
+
+function updatePlaybackUI(status) {
+  ui.playPast.classList.toggle("is-active", state.playbackDirection < 0);
+  ui.playFuture.classList.toggle("is-active", state.playbackDirection > 0);
+  ui.pausePlayback.classList.toggle("is-active", state.playbackDirection === 0);
+  ui.playPast.setAttribute("aria-pressed", String(state.playbackDirection < 0));
+  ui.playFuture.setAttribute("aria-pressed", String(state.playbackDirection > 0));
+  ui.pausePlayback.setAttribute("aria-pressed", String(state.playbackDirection === 0));
+  if (status) ui.playbackStatus.textContent = status;
+  else if (state.playbackDirection < 0) ui.playbackStatus.textContent = "自動往古代";
+  else if (state.playbackDirection > 0) ui.playbackStatus.textContent = "自動往現代";
+}
+
+function pausePlayback(status = "人工操作") {
+  clearTimeout(state.playbackTimer);
+  state.playbackTimer = null;
+  state.playbackDirection = 0;
+  state.snapLockedUntil = 0;
+  updatePlaybackUI(status);
+}
+
+function schedulePlayback(delay = playbackInterval()) {
+  clearTimeout(state.playbackTimer);
+  if (!state.playbackDirection) return;
+  state.playbackTimer = setTimeout(playbackTick, delay);
+}
+
+function playbackTick() {
+  if (!state.playbackDirection) return;
+  const direction = state.playbackDirection;
+  const boundaryReached = direction > 0
+    ? state.year >= state.maxYear
+    : state.year <= state.minYear;
+  if (boundaryReached) {
+    pausePlayback(direction > 0 ? "已抵達最近年代" : "已抵達最早年代");
+    return;
+  }
+  const now = Date.now();
+  if (now < state.snapLockedUntil) {
+    schedulePlayback(Math.max(40, state.snapLockedUntil - now));
+    return;
+  }
+  moveTimeline(direction, false, true);
+  schedulePlayback();
+}
+
+function startPlayback(direction) {
+  state.lastPlaybackDirection = direction;
+  state.playbackDirection = direction;
+  updatePlaybackUI();
+  schedulePlayback(0);
 }
 
 function createCityMarkers() {
@@ -559,7 +697,30 @@ function resetMap(animate = true) {
 }
 
 function setupEvents() {
+  const savedSpeed = localStorage.getItem("P118_PLAYBACK_SPEED");
+  if (["slow", "normal", "fast"].includes(savedSpeed)) {
+    state.playbackSpeed = savedSpeed;
+  }
+  ui.playbackSpeed.value = state.playbackSpeed;
+  updatePlaybackUI("人工操作");
+
+  const setTimelineHelp = (show) => {
+    ui.timelineHelp.hidden = !show;
+    ui.timelineHelpButton.setAttribute("aria-expanded", String(show));
+  };
+
+  ui.timelineHelpButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setTimelineHelp(ui.timelineHelp.hidden);
+  });
+  ui.timelineHelp.addEventListener("click", (event) => event.stopPropagation());
+  document.addEventListener("click", () => setTimelineHelp(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setTimelineHelp(false);
+  });
+
   ui.timeline.addEventListener("input", () => {
+    pausePlayback("人工操作");
     setTimelineYear(Number(ui.timeline.value), false);
   });
 
@@ -570,6 +731,7 @@ function setupEvents() {
     const now = Date.now();
     if (now - lastWheel < 48 || state.stops.length < 2) return;
     lastWheel = now;
+    pausePlayback("人工操作");
     const direction = event.deltaY > 0 ? 1 : -1;
     moveTimeline(direction, event.ctrlKey);
   }, { passive: false });
@@ -580,6 +742,7 @@ function setupEvents() {
     const now = Date.now();
     if (now - lastWheel < 48 || state.stops.length < 2) return;
     lastWheel = now;
+    pausePlayback("人工操作");
     moveTimeline(event.deltaY > 0 ? 1 : -1, true);
   }, { passive: false });
 
@@ -607,12 +770,38 @@ function setupEvents() {
 
   ui.showContext.addEventListener("change", () => {
     if (ui.showContext.checked) return;
-    state.contextQueue = [];
-    clearTimeout(state.contextTimer);
-    state.contextShowing = false;
-    state.currentContext = null;
-    ui.contextToast.hidden = true;
-    ui.contextToast.classList.remove("is-visible", "is-leaving");
+    clearTimeout(state.movementIdleTimer);
+    state.movementStartedAt = null;
+    hideContextEvent(true);
+  });
+
+  ui.playPast.addEventListener("click", () => startPlayback(-1));
+  ui.pausePlayback.addEventListener("click", () => pausePlayback("已暫停"));
+  ui.playFuture.addEventListener("click", () => startPlayback(1));
+  ui.playbackSpeed.addEventListener("change", () => {
+    state.playbackSpeed = ui.playbackSpeed.value;
+    localStorage.setItem("P118_PLAYBACK_SPEED", state.playbackSpeed);
+    if (state.playbackDirection) schedulePlayback(0);
+  });
+
+  ui.contextToast.addEventListener("mouseenter", () => {
+    state.contextHovered = true;
+  });
+  ui.contextToast.addEventListener("mouseleave", () => {
+    state.contextHovered = false;
+    if (state.movementStartedAt != null && Date.now() - state.movementStartedAt >= 3000) {
+      state.movementStartedAt = null;
+      hideContextEvent(false);
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.code !== "Space" || event.repeat) return;
+    const tagName = event.target?.tagName?.toLowerCase();
+    if (["input", "select", "button", "textarea", "a"].includes(tagName)) return;
+    event.preventDefault();
+    if (state.playbackDirection) pausePlayback("已暫停");
+    else startPlayback(state.lastPlaybackDirection);
   });
 
   ui.resetMap.addEventListener("click", () => resetMap(true));
@@ -819,7 +1008,7 @@ function downloadSvg() {
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + width +
     '" height="' + height + '" viewBox="0 0 ' + width + " " + height + '">\n' +
     "<title>P118 先民地圖 — " + escapeXml(formatYear(currentYear())) + "</title>\n" +
-    "<metadata>Generated by P118 V0.4 Temporal Flow &amp; World Context. Current Web Mercator viewport.</metadata>\n" +
+    "<metadata>Generated by P118 V0.4.2 Timeline Data Marks. Current Web Mercator viewport.</metadata>\n" +
     '<g id="land" fill="' + COLORS.land + '" stroke="none" fill-rule="evenodd">' + land + "</g>\n" +
     '<g id="modern-counties" fill="none" stroke="' + COLORS.county +
     '" stroke-width="0.8">' + counties + "</g>\n" +
@@ -860,7 +1049,7 @@ async function initialize() {
     state.sourceMode = sites.mode;
     ui.dataStatus.textContent = sites.mode === "supabase"
       ? "Supabase 遺址資料"
-      : "V0.4 本機示意資料";
+      : "V0.4.2 本機示意資料";
     buildStops();
     updateTimeline();
     updateRecord(activeFeatures());

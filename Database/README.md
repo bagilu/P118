@@ -4,7 +4,7 @@
 
 ## 安裝或升級
 
-全新安裝時，依檔名前綴順序，在 Supabase SQL Editor 執行 `01` 至 `11`。
+全新安裝時，依檔名前綴順序，在 Supabase SQL Editor 執行 `01` 至 `12`。
 
 若已完成V0.2的01至08，只需再執行 `09_AddEvidenceAndSites.sql`。
 
@@ -14,6 +14,7 @@
 - `09_AddEvidenceAndSites.sql`：增加位置品質及證據欄位，擴充為17個文化—遺址關聯。
 - `10_AddDapenkengCulture.sql`：加入大坌坑文化8處遺址及遺址個別年代。
 - `11_AddWorldContext.sql`：建立全球同期事件資料表、讀取RPC與10筆示範資料。
+- `12_AddYuanshanCulture.sql`：加入圓山文化及第一批6處具證據關聯的遺址。
 
 V0.2 的點位架構不需要 PostGIS。若 V0.1 已啟用 PostGIS，不必停用；其他專案可能仍會使用它。
 

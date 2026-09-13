@@ -36,12 +36,35 @@
     <div class="workspace">
       <aside class="controls" aria-label="年代與圖層控制">
         <section class="panel timeline-panel" id="timelinePanel">
-          <div class="section-title"><span>◷</span><div><small>TIME</small><h2>年代</h2></div></div>
+          <div class="timeline-heading">
+            <div class="section-title timeline-title"><span>◷</span><div><small>TIME</small><h2>年代</h2></div></div>
+            <button id="timelineHelpButton" class="timeline-help-button" type="button" aria-label="顯示年代操作說明" aria-expanded="false" aria-controls="timelineHelp">?</button>
+            <div id="timelineHelp" class="timeline-help" role="note" hidden>
+              <strong>年代操作</strong>
+              <p>在年代區域滾動可連續穿越年代；接近遺址或全球事件時會自動減速並對準。Ctrl＋滾輪可精細移動。</p>
+            </div>
+          </div>
           <output id="yearDisplay" class="year-display">BC 28,050</output>
           <div id="bpDisplay" class="bp-display">換算約 30,000 BP</div>
-          <input id="timeline" type="range" min="0" max="1" step="1" value="0" aria-label="年代">
+          <div class="timeline-track-shell">
+            <div id="timelineMarks" class="timeline-marks" aria-label="有資料的年代刻度"></div>
+            <input id="timeline" type="range" min="0" max="1" step="1" value="0" aria-label="年代">
+          </div>
           <div class="range-ends"><span id="firstYear">BC 28,050</span><span id="lastYear">BC 350</span></div>
-          <p class="hint">在此區域滾動可連續穿越年代；接近遺址或全球事件時會自動減速並對準。Ctrl＋滾輪可精細移動。</p>
+          <div class="playback-controls" aria-label="年代自動播放">
+            <button id="playPast" type="button" title="自動往古代移動" aria-label="自動往古代移動">◀</button>
+            <button id="pausePlayback" type="button" title="暫停年代播放" aria-label="暫停年代播放">Ⅱ</button>
+            <button id="playFuture" type="button" title="自動往現代移動" aria-label="自動往現代移動">▶</button>
+          </div>
+          <div class="playback-options">
+            <label for="playbackSpeed">速度</label>
+            <select id="playbackSpeed">
+              <option value="slow">慢速</option>
+              <option value="normal" selected>標準</option>
+              <option value="fast">快速</option>
+            </select>
+            <output id="playbackStatus">人工操作</output>
+          </div>
         </section>
 
         <section class="panel">
@@ -94,7 +117,7 @@
       </aside>
     </div>
 
-    <footer><span>P118 先民地圖 · V0.4 Temporal Flow &amp; World Context</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
+    <footer><span>P118 先民地圖 · V0.4.2 Timeline Data Marks</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
   </main>
   <script src="./app.js"></script>
 </body>
