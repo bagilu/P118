@@ -7,8 +7,8 @@
   <title>P118 先民地圖</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="./styles.css">
-  <script src="./config.js"></script>
+  <link rel="stylesheet" href="./styles.css?v=0.4.2.1">
+  <script src="./config.js?v=0.4.2.1"></script>
   <script src="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.js"></script>
 </head>
 <body>
@@ -37,19 +37,16 @@
       <aside class="controls" aria-label="年代與圖層控制">
         <section class="panel timeline-panel" id="timelinePanel">
           <div class="timeline-heading">
-            <div class="section-title timeline-title"><span>◷</span><div><small>TIME</small><h2>年代</h2></div></div>
-            <button id="timelineHelpButton" class="timeline-help-button" type="button" aria-label="顯示年代操作說明" aria-expanded="false" aria-controls="timelineHelp">?</button>
+            <div class="timeline-title"><span aria-hidden="true">◷</span><small>TIME</small><h2>年代</h2></div>
+            <button id="timelineHelpButton" class="timeline-help-button" type="button" title="年代操作說明" aria-label="年代操作說明" aria-expanded="false" aria-controls="timelineHelp">?</button>
             <div id="timelineHelp" class="timeline-help" role="note" hidden>
-              <strong>年代操作</strong>
-              <p>在年代區域滾動可連續穿越年代；接近遺址或全球事件時會自動減速並對準。Ctrl＋滾輪可精細移動。</p>
+              在年代區域滾動可連續穿越年代；接近遺址或全球事件時會自動減速並對準。Ctrl＋滾輪可精細移動。
             </div>
           </div>
           <output id="yearDisplay" class="year-display">BC 28,050</output>
           <div id="bpDisplay" class="bp-display">換算約 30,000 BP</div>
-          <div class="timeline-track-shell">
-            <div id="timelineMarks" class="timeline-marks" aria-label="有資料的年代刻度"></div>
-            <input id="timeline" type="range" min="0" max="1" step="1" value="0" aria-label="年代">
-          </div>
+          <input id="timeline" type="range" min="0" max="1" step="1" value="0" aria-label="年代">
+          <div id="timelineMarks" class="timeline-marks" aria-label="有資料的年代刻度"></div>
           <div class="range-ends"><span id="firstYear">BC 28,050</span><span id="lastYear">BC 350</span></div>
           <div class="playback-controls" aria-label="年代自動播放">
             <button id="playPast" type="button" title="自動往古代移動" aria-label="自動往古代移動">◀</button>
@@ -117,8 +114,8 @@
       </aside>
     </div>
 
-    <footer><span>P118 先民地圖 · V0.4.2 Timeline Data Marks</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
+    <footer><span>P118 先民地圖 · V0.4.2.1 Timeline Data Marks</span><span>基礎圖資：內政部國土測繪中心、Natural Earth</span></footer>
   </main>
-  <script src="./app.js"></script>
+  <script src="./app.js?v=0.4.2.1"></script>
 </body>
 </html>
