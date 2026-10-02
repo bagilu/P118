@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="P118先民地圖紅白對抗：將考古遺址放回臺灣的空間與時間。">
+  <title>P118 紅白對抗｜先民地圖</title>
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="./p118-game.css?v=0.1.0">
+  <script src="../config.js?v=0.4.2.1"></script>
+  <script src="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.js"></script>
+</head>
+<body class="p118-game-body">
+  <main class="p118-game-shell">
+    <header class="p118-game-header">
+      <div class="p118-game-brand">
+        <div class="p118-game-credit">
+          <span>慈濟大學</span><span>經營管理學系</span>
+          <a href="https://tcubmdsbilab.github.io/P101/" target="_blank" rel="noopener">好玩實驗室</a><span>作品</span>
+        </div>
+        <div class="p118-game-title-row">
+          <a class="p118-game-back" href="../">← 回到先民地圖</a>
+          <div><small>P118 · SPACE-TIME CHALLENGE</small><h1>紅白對抗</h1></div>
+        </div>
+      </div>
+      <div class="p118-game-scoreboard" aria-label="目前比分">
+        <section class="p118-game-team-score p118-game-team-score--red">
+          <span>紅隊</span><strong id="redScore">0</strong><small>分</small>
+        </section>
+        <div class="p118-game-round"><small>回合</small><strong id="roundNumber">1 / 6</strong></div>
+        <section class="p118-game-team-score p118-game-team-score--white">
+          <span>白隊</span><strong id="whiteScore">0</strong><small>分</small>
+        </section>
+      </div>
+    </header>
+
+    <section class="p118-game-turn" id="turnBanner" data-team="red">
+      <span id="turnTeam">紅隊</span>
+      <div><small>本回合遺址</small><strong id="questionTitle">準備開始</strong><em id="questionEnglish"></em></div>
+      <span class="p118-game-status" id="dataStatus">讀取資料中</span>
+    </section>
+
+    <section class="p118-game-workspace" aria-label="紅白對抗遊戲區">
+      <div class="p118-game-map-panel">
+        <div id="gameMap" class="p118-game-map" aria-label="臺灣地圖答題區"></div>
+        <div class="p118-game-map-instruction">
+          <strong>① 放置遺址</strong>
+          <span>拖曳圓形標記，或直接點擊地圖</span>
+        </div>
+        <div class="p118-game-map-legend"><i></i>公布答案後顯示正確代表位置</div>
+      </div>
+
+      <aside class="p118-game-control-panel">
+        <section class="p118-game-instruction-card">
+          <small>HOW TO PLAY</small>
+          <h2>把遺址放回正確的空間與時間</h2>
+          <p>先在地圖上放置遺址，再移動時間軸。兩項都完成後即可鎖定答案。</p>
+        </section>
+
+        <section class="p118-game-time-card">
+          <div class="p118-game-step-heading"><strong>② 選擇年代</strong><output id="selectedYear">尚未選擇</output></div>
+          <div class="p118-game-slider-wrap">
+            <input id="gameTimeline" type="range" min="0" max="1000" step="1" value="500" aria-label="選擇年代">
+            <div id="correctRange" class="p118-game-correct-range" hidden></div>
+          </div>
+          <div class="p118-game-scale"><span>BC 30,000</span><span>BC 6,000</span><span>BC 1,000</span><span>AD 1,750</span></div>
+          <p>年代範圍內皆視為正確；BC與AD之間沒有西元0年。</p>
+        </section>
+
+        <section id="feedback" class="p118-game-feedback" hidden aria-live="polite">
+          <div><small>位置距離</small><strong id="distanceResult">—</strong><span id="locationPoints">—</span></div>
+          <div><small>年代誤差</small><strong id="yearResult">—</strong><span id="timePoints">—</span></div>
+          <div class="p118-game-total"><small>本題得分</small><strong id="roundScore">—</strong></div>
+          <p id="answerSummary"></p>
+        </section>
+
+        <div class="p118-game-actions">
+          <button id="lockAnswer" class="p118-game-button p118-game-button--primary" type="button" disabled>鎖定答案</button>
+          <button id="nextRound" class="p118-game-button p118-game-button--secondary" type="button" hidden>下一隊</button>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="p118-game-footer">
+      <span>P118 紅白對抗 · V0.1 Game Preview</span>
+      <span>本模式僅讀取P118公開資料，不儲存玩家作答</span>
+    </footer>
+  </main>
+
+  <dialog id="startDialog" class="p118-game-dialog">
+    <div class="p118-game-dialog-mark">P118</div>
+    <small>RED vs. WHITE</small>
+    <h2>把遺址放回臺灣的空間與時間</h2>
+    <p>紅白兩隊輪流作答，共六題。每題的位置與年代各50分。</p>
+    <ol><li>把遺址標記放在地圖上</li><li>移動時間軸選擇年代</li><li>鎖定答案並查看距離</li></ol>
+    <button id="startGame" class="p118-game-button p118-game-button--primary" type="button">開始紅白對抗</button>
+    <a href="../">返回探索模式</a>
+  </dialog>
+
+  <dialog id="resultDialog" class="p118-game-dialog p118-game-result-dialog">
+    <small>FINAL RESULT</small>
+    <h2 id="winnerTitle">本場結果</h2>
+    <div class="p118-game-final-scores"><span>紅隊 <strong id="finalRed">0</strong></span><span>白隊 <strong id="finalWhite">0</strong></span></div>
+    <p id="winnerMessage"></p>
+    <button id="restartGame" class="p118-game-button p118-game-button--primary" type="button">再玩一次</button>
+    <a href="../">回到先民地圖</a>
+  </dialog>
+
+  <script src="./p118-game-questions.js?v=0.1.0"></script>
+  <script src="./p118-game.js?v=0.1.0"></script>
+</body>
+</html>
