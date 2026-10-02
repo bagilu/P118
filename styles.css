@@ -83,12 +83,23 @@ button:disabled { cursor: wait; opacity: .55; }
 .downloads { display: flex; gap: .6rem; }
 .button {
   min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: .6rem .9rem;
   color: white;
   border: 1px solid #71888b;
   border-radius: 2px;
   font-weight: 700;
+  text-decoration: none;
 }
+.button.game-link {
+  border-color: #f1d9d1;
+  background: linear-gradient(90deg, #a94735 0 49%, #f8f8f3 49% 51%, #71888b 51% 100%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 14%);
+}
+.button.game-link:hover { filter: brightness(1.08); }
+.button.game-link:focus-visible { outline: 3px solid rgb(242 178 145 / 45%); outline-offset: 2px; }
 .button.secondary { background: transparent; }
 .button.secondary:hover { background: #31545a; }
 .button.primary { border-color: var(--accent); background: var(--accent); }
